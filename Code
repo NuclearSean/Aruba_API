@@ -1,0 +1,136 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Aug 11 01:42:46 2021
+
+@author: Sean W. Hyland
+"""
+import xml.etree.ElementTree as ET
+from airwaveapiclient import AirWaveAPIClient
+import pandas as pd
+from datetime import datetime
+import collections
+import os
+import time
+
+starttime = time.time()
+
+res_return = []
+nan_value = float("NaN")
+'''Credentials for Aruba site'''
+data = 'credential_0=awapiuser&credential_1=awapiuser&destination=/&login=Log In'
+headers={'Content-Type': 'application/x-www-form-urlencoded','Cache-Control':'no-cache'}
+airwave = AirWaveAPIClient(username='Enter User Name',password='Enter User Passwork',url='https://Enter Aruba Website/ap_list.xml')
+response = airwave.login()
+Aruba_range = list(range(enter range of APs from start, finish))
+for i in Aruba_range:
+        x = airwave.ap_detail(i)
+        x = x.text
+        root = ET.fromstring(x) 
+        x = root.findall('.//')
+        try:
+            x = x[3].text
+        except:
+            print(f"The following AP had no data {i}")
+        else:
+            final = (x, i)
+            res_return.append(final)        
+df = pd.DataFrame(res_return, columns = ["AP", "Index"])
+df.replace("\n      ", nan_value, inplace=True)
+df.replace("", nan_value, inplace=True)
+aruba_ref = df
+os.chdir("C:\\Users\\swh010\\OneDrive - American Family Insurance\\Occupancy-000000697056PC-2")
+df.dropna(subset = ["AP"], inplace = True)
+df = df.loc[:,"Index"]
+df = df.values.tolist()
+
+while True:    
+    '''Credentials for Aruba site'''
+    print("Start time",time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+    data = 'credential_0=awapiuser&credential_1=awapiuser&destination=/&login=Log In'
+    headers={'Content-Type': 'application/x-www-form-urlencoded','Cache-Control':'no-cache'}
+    airwave = AirWaveAPIClient(username='Enter User Name',password='Enter User Password',url='https://Enter Aruba Website/ap_list.xml')
+    response = airwave.login()
+    res = airwave.ap_detail(Enter Known Active AP Number)
+    Aruba_data = res.text
+    '''print(datat) To see data structure'''
+    #tree = ET.parse(Aruba_data)
+    root = ET.fromstring(Aruba_data)
+    results = []
+    x = []
+    try:
+        ap = root[0][2].text
+    except:
+        print("")
+    for child in root.findall(".//"):
+         x = child.tag, child.text
+         results.append(tuple(x))
+    x = [result for result in results if result != "name" in result]
+    counter = dict(collections.Counter(x))
+    a_list = list({key for key, value in counter.items() if value == 1})
+    occupancy = [item for t in a_list for item in t]
+    counter = dict(collections.Counter(occupancy))
+    occupancy = list({key for key, value in counter.items() if value == 1})
+    occupancy = pd.DataFrame(occupancy)
+    #occupancy = np.transpose(occupancy)
+    now = datetime.now()
+    now = now.strftime("%Y-%m-%d %H:%M:%S")
+    occupancy.insert(loc=0, column='Date', value=now)
+    occupancy.insert(loc=1, column='Location', value=ap)
+    
+    
+    for i in df:
+        res = airwave.ap_detail(i)
+        Aruba_data = res.text
+        root = ET.fromstring(Aruba_data)
+        results = []
+        x = []
+        try:
+            ap = root[0][2].text
+        except:
+            pass
+        for child in root.findall(".//"):
+#            print(child.tag, child.text)
+#            print(child.text)
+            x = child.tag, child.text
+            results.append(tuple(x))
+        x = [result for result in results if result != "name" in result]
+        counter = dict(collections.Counter(x))
+        a_list = list({key for key, value in counter.items() if value == 1})
+        occupancy1 = [item for t in a_list for item in t]
+        counter = dict(collections.Counter(occupancy1))
+        occupancy1 = list({key for key, value in counter.items() if value == 1})
+        occupancy1 = pd.DataFrame(occupancy1)
+        now = datetime.now()
+        now = now.strftime("%Y-%m-%d %H:%M:%S")
+        occupancy1.insert(loc=0, column='Date', value=now)
+        occupancy1.insert(loc=1, column='Location', value=ap)
+        occupancy = occupancy.append(occupancy1, ignore_index = True)
+    
+    analysis = occupancy
+    analysis.rename(columns={ analysis.columns[2]: "ID" }, inplace = True)
+    analysis = analysis[~analysis['ID'].isin(['GE0/'])]
+    keep = analysis[analysis['ID'].str.contains("CORPORATE")]
+    keep1 = analysis[analysis['ID'].str.contains("host")]
+    keep2 = analysis[analysis['ID'].str.contains("@email")]
+    keep3 = analysis[analysis['ID'].apply(lambda x: len(x) == 6)]
+    keep3 = keep3[~keep3.ID.str.contains("/")]
+    keep4 = analysis[analysis['ID'].str.contains("\.")]
+    keep5 = analysis[analysis['ID'].str.contains(":")]
+    keep = keep.append(keep1, ignore_index=False)
+    keep = keep.append(keep2, ignore_index=False)
+    keep = keep.append(keep3, ignore_index=False)
+    keep = keep.append(keep4, ignore_index=False)
+    keep = keep.append(keep5, ignore_index=False)
+    keep = keep.drop_duplicates(subset=['ID'])
+    
+    
+    # Import data file to append new data
+    os.chdir("Enter the directory location where you want to store data")
+    # Created a predifined header for file
+    Occupancy = pd.read_csv('Occupancy.csv')
+    frames = [keep, Occupancy]
+    Occupancy = pd.concat(frames)
+    Occupancy.drop_duplicates()
+    Occupancy.to_csv("Occupancy.csv", index = False)
+    print(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
+    time.sleep(3600.0 - ((time.time() - starttime) % 3600.0))
